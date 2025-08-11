@@ -46,13 +46,18 @@ const navByRole: Record<Role, { label: string; to: string }[]> = {
   ],
 };
 
+const publicLinks = [
+  { label: "Home", to: "/" },
+  { label: "Venues", to: "/venues" },
+];
+
 export default function Navbar() {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const [role, setRole] = useState<Role>(() =>
-    (localStorage.getItem("qc_role") as Role) || "user"
+  const [role, setRole] = useState<Role>(
+    () => (localStorage.getItem("qc_role") as Role) || "user"
   );
-  
+
   useEffect(() => {
     if (user) {
       setRole(user.role);
@@ -60,11 +65,14 @@ export default function Navbar() {
     localStorage.setItem("qc_role", role);
   }, [role, user]);
 
-  const links = useMemo(() => navByRole[role], [role]);
+  const links = useMemo(() => {
+    if (!user) return publicLinks;
+    return navByRole[role] || publicLinks;
+  }, [role, user]);
 
   const brand = (
     <Link to="/" className="flex items-center gap-2">
-      <span className="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-[var(--gradient-primary)]">
+      <span className="text-lg font-extrabold tracking-tight bg-clip-text bg-[var(--gradient-primary)]">
         QuickCourt
       </span>
     </Link>
@@ -78,7 +86,11 @@ export default function Navbar() {
             to={l.to}
             end
             className={({ isActive }) =>
-              `text-sm ${isActive ? "text-primary font-semibold" : "text-foreground/80 hover:text-foreground"}`
+              `text-sm ${
+                isActive
+                  ? "text-primary font-semibold"
+                  : "text-foreground/80 hover:text-foreground"
+              }`
             }
           >
             {l.label}
@@ -161,17 +173,26 @@ export default function Navbar() {
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 p-2">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.profileImage} alt={user.fullName} />
+                        <AvatarImage
+                          src={user.profileImage}
+                          alt={user.fullName}
+                        />
                         <AvatarFallback>
                           {user.fullName?.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-sm font-medium">{user.fullName}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {user.email}
+                        </p>
                       </div>
                     </div>
-                    <Button variant="ghost" onClick={logout} className="justify-start">
+                    <Button
+                      variant="ghost"
+                      onClick={logout}
+                      className="justify-start"
+                    >
                       <LogOut className="mr-2 h-4 w-4" />
                       Log out
                     </Button>

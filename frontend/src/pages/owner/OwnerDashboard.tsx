@@ -590,7 +590,7 @@ export default function OwnerDashboard() {
               </Link>
             </Button>
             <Button variant="outline" asChild className="h-auto p-4 flex-col gap-2">
-              <Link to="/owner/slots">
+              <Link to="/owner/time-slots">
                 <Clock className="h-6 w-6" />
                 <span>Time Slots</span>
               </Link>

@@ -17,7 +17,7 @@ import Signup from "@/pages/auth/Signup";
 import OwnerDashboard from "@/pages/owner/OwnerDashboard";
 import VenueManagement from "@/pages/owner/VenueManagement";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
-import FacilityManagement from "@/pages/owner/FacilityManagement";
+// import FacilityManagement from "@/pages/owner/FacilityManagement";
 import CourtManagement from "@/pages/owner/CourtManagement";
 import TimeSlotManagement from "@/pages/owner/TimeSlotManagement";
 import BookingsOverview from "@/pages/owner/BookingsOverview";

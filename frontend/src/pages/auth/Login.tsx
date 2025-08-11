@@ -21,6 +21,38 @@ export default function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  
+  const validateForm = () => {
+    if (!email.trim() || !password.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    // simple email pattern
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+
   // Debug logging
   console.log('Login component rendered, current step:', step);
 
@@ -34,6 +66,8 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+      if (!validateForm()) return;
 
     try {
       await login(email, password);

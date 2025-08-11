@@ -35,7 +35,7 @@ export default function VenueFilters({
   availableSports,
   loading = false,
 }: Props) {
-  const sports = useMemo(() => ["All", ...availableSports], [availableSports]);
+  const sports = useMemo(() => [...availableSports], [availableSports]);
 
   if (loading) {
     return (
