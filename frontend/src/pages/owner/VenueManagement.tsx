@@ -8,18 +8,18 @@ import { ownerAPI, venuesAPI } from "@/services/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  AlertCircle, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  MapPin, 
-  Star, 
+import {
+  AlertCircle,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  MapPin,
+  Star,
   Calendar,
   Building2,
   Users,
-  DollarSign
+  DollarSign,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import CreateVenueModal from "@/components/modals/CreateVenueModal";
@@ -34,7 +34,7 @@ interface Venue {
   address: string;
   rating: number;
   totalRatings: number;
-  isApproved: boolean;
+  isApproved: number;
   isActive: boolean;
   courtCount: number;
   activeCourts: number;
@@ -49,7 +49,7 @@ export default function VenueManagement() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -97,8 +97,12 @@ export default function VenueManagement() {
   };
 
   const getStatusBadge = (venue: Venue) => {
-    if (!venue.isApproved) {
+    if (venue.isApproved == 0) {
       return <Badge variant="secondary">Pending Approval</Badge>;
+    } else if (venue.isApproved == 2) {
+      return <Badge variant="destructive">Rejected</Badge>;
+    } else if (venue.isApproved == 1) {
+      return <Badge variant="default">Approved</Badge>;
     }
     if (!venue.isActive) {
       return <Badge variant="destructive">Inactive</Badge>;
@@ -123,7 +127,10 @@ export default function VenueManagement() {
     <main className="container mx-auto px-4 py-10 space-y-8">
       <Helmet>
         <title>Venue Management – QuickCourt</title>
-        <meta name="description" content="Manage your sports venues and courts." />
+        <meta
+          name="description"
+          content="Manage your sports venues and courts."
+        />
         <link rel="canonical" href="/owner/venues" />
       </Helmet>
 
@@ -149,7 +156,11 @@ export default function VenueManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-16" /> : venuesList.length}
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                venuesList.length
+              )}
             </div>
           </CardContent>
         </Card>
@@ -160,7 +171,11 @@ export default function VenueManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-16" /> : venuesList.filter((v) => v.isActive && v.isApproved).length}
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                venuesList.filter((v) => v.isActive && v.isApproved).length
+              )}
             </div>
           </CardContent>
         </Card>
@@ -171,18 +186,28 @@ export default function VenueManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-16" /> : venuesList.reduce((sum, v) => sum + (v.courtCount || 0), 0)}
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                venuesList.reduce((sum, v) => sum + (v.courtCount || 0), 0)
+              )}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Pending Approval
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? <Skeleton className="h-8 w-16" /> : venuesList.filter((v) => !v.isApproved).length}
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                venuesList.filter((v) => !v.isApproved).length
+              )}
             </div>
           </CardContent>
         </Card>
@@ -224,7 +249,7 @@ export default function VenueManagement() {
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {venue.description}
                 </p>
-                
+
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4" />
                   <span>{venue.address}</span>
@@ -232,7 +257,10 @@ export default function VenueManagement() {
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Star className="h-4 w-4" />
-                  <span>{(venue.rating ?? 0).toFixed(1)} ({venue.totalRatings ?? 0} reviews)</span>
+                  <span>
+                    {(venue.rating ?? 0).toFixed(1)} ({venue.totalRatings ?? 0}{" "}
+                    reviews)
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -241,7 +269,7 @@ export default function VenueManagement() {
                 </div>
 
                 {/* Quick add courts CTA */}
-                <div className="pt-2">
+                <div className={venue.isApproved == 0 ? "pt-2" : "hidden pt-2"}>
                   <Button asChild size="sm" variant="outline">
                     <Link to="/owner/courts">Add courts for this venue</Link>
                   </Button>
@@ -259,23 +287,37 @@ export default function VenueManagement() {
                       View
                     </Link>
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(venue)}
-                    className="flex-1"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(venue)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {venue.isApproved == 0 ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(venue)}
+                        className="flex-1"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(venue)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        defaultValue={venue.description}
+                        disabled={true}
+                        readOnly={true}
+                        className="border rounded-md px-2 py-1 w-full flex-1"
+                      />
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -289,7 +331,8 @@ export default function VenueManagement() {
             </div>
             <h3 className="text-lg font-semibold mb-2">No Venues Yet</h3>
             <p className="text-muted-foreground mb-4">
-              Get started by adding your first sports venue to start accepting bookings.
+              Get started by adding your first sports venue to start accepting
+              bookings.
             </p>
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />

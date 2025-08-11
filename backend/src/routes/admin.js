@@ -61,7 +61,7 @@ router.put('/venues/:id/approve', async (req, res) => {
       UPDATE venues 
       SET isApproved = ?, updatedAt = CURRENT_TIMESTAMP
       WHERE id = ?
-    `, [approved ? 1 : 0, id]);
+    `, [approved ? 1 : 2, id]);
 
     console.log(`Updated venue ${id} isApproved to: ${approved ? 1 : 0}`);
 
