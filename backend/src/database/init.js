@@ -30,6 +30,9 @@ export const initializeDatabase = async () => {
 
   // Create tables
   await createTables();
+
+  // Run lightweight migrations for existing databases
+  await runMigrations();
   
   return db;
 };
@@ -221,6 +224,21 @@ const createTables = async () => {
 
   // Insert default sports
   await insertDefaultSports();
+};
+
+// Lightweight migrations to evolve existing databases without full reset
+const runMigrations = async () => {
+  // Helper to add a column if it is missing
+  const addColumnIfMissing = async (tableName, columnName, columnDefinition) => {
+    const columns = await db.all(`PRAGMA table_info(${tableName})`);
+    const hasColumn = columns.some(col => col.name === columnName);
+    if (!hasColumn) {
+      await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+    }
+  };
+
+  // Ensure timeSlots has isMaintenance column
+  await addColumnIfMissing('timeSlots', 'isMaintenance', 'INTEGER DEFAULT 0');
 };
 
 const insertDefaultSports = async () => {

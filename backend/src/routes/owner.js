@@ -1,6 +1,7 @@
 import express from 'express';
 import { getDatabase } from '../database/init.js';
 import { protect, authorize } from '../middleware/auth.js';
+import { randomUUID } from 'crypto';
 
 const router = express.Router();
 
@@ -142,7 +143,7 @@ router.post('/courts/:courtId/slots/bulk', async (req, res) => {
         await db.run(`
           INSERT INTO timeSlots (id, courtId, startTime, endTime, dayOfWeek, isAvailable, isMaintenance)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [require('crypto').randomUUID(), courtId, s.startTime, s.endTime, s.dayOfWeek, s.isAvailable ? 1 : 0, s.isMaintenance ? 1 : 0]);
+        `, [randomUUID(), courtId, s.startTime, s.endTime, s.dayOfWeek, s.isAvailable ? 1 : 0, s.isMaintenance ? 1 : 0]);
       }
     }
     await db.run('COMMIT');

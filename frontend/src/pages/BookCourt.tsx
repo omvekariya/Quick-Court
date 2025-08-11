@@ -16,7 +16,7 @@ import { AlertCircle, Calendar as CalendarIcon, Clock, MapPin, CreditCard, User 
 import { format, addDays, isSameDay, parseISO } from "date-fns";
 
 export default function BookCourt() {
-  const { venueId } = useParams();
+  const { id: venueId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -24,8 +24,7 @@ export default function BookCourt() {
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedCourt, setSelectedCourt] = useState<string>("");
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
-  const [duration, setDuration] = useState<number>(60); // minutes
+  const [selectedSlots, setSelectedSlots] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
   // Fetch venue details
   const { data: venueData, isLoading: venueLoading, error: venueError } = useQuery({
@@ -44,25 +43,29 @@ export default function BookCourt() {
     queryFn: () => venuesAPI.getTimeSlots(venueId as string, selectedCourt, format(selectedDate!, 'yyyy-MM-dd')),
   });
 
-  const timeSlots = timeSlotsData?.data?.data || [];
+  const timeSlots = (timeSlotsData?.data?.data || []) as Array<{ startTime: string; endTime: string; booked?: boolean }>;
+
+  const toggleSlot = (slot: { startTime: string; endTime: string }) => {
+    const key = `${slot.startTime}-${slot.endTime}`;
+    if (selectedSlots.some(s => `${s.startTime}-${s.endTime}` === key)) {
+      setSelectedSlots(prev => prev.filter(s => `${s.startTime}-${s.endTime}` !== key));
+    } else {
+      setSelectedSlots(prev => [...prev, slot]);
+    }
+  };
 
   // Create booking mutation
   const createBooking = useMutation({
     mutationFn: async () => {
-      if (!selectedCourt || !selectedTimeSlot || !selectedDate) {
-        throw new Error('Please select all required fields');
+      if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
+        throw new Error('Please select court, date and at least one slot');
       }
 
-      const [startTime, endTime] = selectedTimeSlot.split(' - ');
-      const endTimeAdjusted = addMinutes(startTime, duration);
-
-      return await bookingsAPI.create({
+      return await bookingsAPI.bulkCreate({
         courtId: selectedCourt,
         date: format(selectedDate, 'yyyy-MM-dd'),
-        startTime,
-        endTime: endTimeAdjusted,
-        duration,
-        notes: `Booking for ${duration} minutes`
+        slots: selectedSlots,
+        notes: `Bulk booking for ${selectedSlots.length} slot(s)`
       });
     },
     onSuccess: (data) => {
@@ -70,8 +73,8 @@ export default function BookCourt() {
         title: 'Booking Created!',
         description: 'Your court has been booked successfully.',
       });
-      // Navigate to booking confirmation or user's bookings
-      navigate('/bookings');
+      // Navigate to user's bookings
+      navigate('/my-bookings');
     },
     onError: (error: any) => {
       toast({
@@ -82,14 +85,7 @@ export default function BookCourt() {
     }
   });
 
-  // Helper function to add minutes to time string
-  const addMinutes = (timeStr: string, minutes: number): string => {
-    const [hours, mins] = timeStr.split(':').map(Number);
-    const totalMinutes = hours * 60 + mins + minutes;
-    const newHours = Math.floor(totalMinutes / 60);
-    const newMins = totalMinutes % 60;
-    return `${String(newHours).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`;
-  };
+  // No duration handling needed now
 
   // Get available dates (next 30 days)
   const availableDates = Array.from({ length: 30 }, (_, i) => addDays(new Date(), i));
@@ -97,22 +93,27 @@ export default function BookCourt() {
   // Filter out past dates and unavailable dates
   const selectableDates = availableDates.filter(date => date >= new Date());
 
-  // Calculate price for selected court and duration
+  // Calculate price for selected slots
   const selectedCourtData = courts.find(c => c.id === selectedCourt);
   const pricePerHour = selectedCourtData?.pricePerHour || 0;
-  const totalPrice = (pricePerHour * duration) / 60;
+  const totalMinutes = selectedSlots.reduce((sum, s) => {
+    const [sh, sm] = s.startTime.split(':').map(Number);
+    const [eh, em] = s.endTime.split(':').map(Number);
+    return sum + ((eh * 60 + em) - (sh * 60 + sm));
+  }, 0);
+  const totalPrice = (pricePerHour * totalMinutes) / 60;
 
   // Handle court selection change
   useEffect(() => {
     if (selectedCourt) {
-      setSelectedTimeSlot(""); // Reset time slot when court changes
+      setSelectedSlots([]);
     }
   }, [selectedCourt]);
 
   // Handle date selection change
   useEffect(() => {
     if (selectedDate) {
-      setSelectedTimeSlot(""); // Reset time slot when date changes
+      setSelectedSlots([]);
     }
   }, [selectedDate]);
 
@@ -284,41 +285,28 @@ export default function BookCourt() {
                     </p>
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
-                      {timeSlots.map((slot) => (
-                        <Button
-                          key={`${slot.startTime}-${slot.endTime}`}
-                          variant={selectedTimeSlot === `${slot.startTime} - ${slot.endTime}` ? "default" : "outline"}
-                          onClick={() => setSelectedTimeSlot(`${slot.startTime} - ${slot.endTime}`)}
-                          className="h-12"
-                        >
-                          {slot.startTime}
-                        </Button>
-                      ))}
+                      {timeSlots.map((slot) => {
+                        const key = `${slot.startTime}-${slot.endTime}`;
+                        const isSelected = selectedSlots.some(s => `${s.startTime}-${s.endTime}` === key);
+                        return (
+                          <Button
+                            key={key}
+                            variant={isSelected ? "default" : slot.booked ? "secondary" : "outline"}
+                            disabled={slot.booked}
+                            onClick={() => toggleSlot({ startTime: slot.startTime, endTime: slot.endTime })}
+                            className="h-12"
+                          >
+                            {slot.startTime}
+                            {slot.booked ? ' (Booked)' : ''}
+                          </Button>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Duration Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Duration</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[30, 60, 90, 120].map((mins) => (
-                      <Button
-                        key={mins}
-                        variant={duration === mins ? "default" : "outline"}
-                        onClick={() => setDuration(mins)}
-                        className="h-12"
-                      >
-                        {mins} min
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Duration Selection removed for multi-slot */}
             </>
           )}
         </div>

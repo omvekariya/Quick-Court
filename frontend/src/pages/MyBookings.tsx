@@ -53,14 +53,12 @@ export default function MyBookings() {
     paymentStatus: string;
     notes?: string;
     createdAt: string;
-    court: {
-      name: string;
-      sportName: string;
-      venue: {
-        name: string;
-        location: string;
-      };
-    };
+    courtName: string;
+    sportName: string;
+    pricePerHour: number;
+    venueId: string;
+    venueName: string;
+    venueLocation: string;
   }>;
 
   const cancelBooking = useMutation({
@@ -209,13 +207,13 @@ export default function MyBookings() {
                     <TableRow key={booking.id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{booking.court.venue.name}</div>
+                          <div className="font-medium">{booking.venueName}</div>
                           <div className="text-sm text-muted-foreground">
-                            {booking.court.name} ({booking.court.sportName})
+                            {booking.courtName} ({booking.sportName})
                           </div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
-                            {booking.court.venue.location}
+                            {booking.venueLocation}
                           </div>
                         </div>
                       </TableCell>
@@ -268,7 +266,7 @@ export default function MyBookings() {
                             size="sm"
                             asChild
                           >
-                            <Link to={`/venue/${booking.court.venue.id}`}>
+                            <Link to={`/venue/${booking.venueId}`}>
                               <Eye className="h-4 w-4" />
                             </Link>
                           </Button>

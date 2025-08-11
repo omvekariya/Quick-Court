@@ -118,7 +118,9 @@ export default function TimeSlotManagement() {
 
   const saveTimeSlots = useMutation({
     mutationFn: async () => {
-      if (!selectedCourtId) throw new Error('No court selected');
+      if (!selectedCourtId) {
+        throw new Error('Please select a court before saving');
+      }
       
       const payload = TIME_SLOTS.map(timeSlot => 
         DAYS.map(day => ({
@@ -126,7 +128,7 @@ export default function TimeSlotManagement() {
           startTime: timeSlot.start,
           endTime: timeSlot.end,
           isAvailable: !isSlotSelected(day.id, timeSlot),
-          isMaintenance: maintenanceMode && isSlotSelected(day.id, timeSlot) || false
+          isMaintenance: (maintenanceMode && isSlotSelected(day.id, timeSlot)) || false
         }))
       ).flat();
 
@@ -141,9 +143,10 @@ export default function TimeSlotManagement() {
       refetch();
     },
     onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to update time slots';
       toast({ 
         title: 'Error', 
-        description: error.response?.data?.error || 'Failed to update time slots', 
+        description: message, 
         variant: 'destructive' 
       });
     }
@@ -288,7 +291,13 @@ export default function TimeSlotManagement() {
             <CardContent>
               <Button 
                 variant="hero" 
-                onClick={() => saveTimeSlots.mutate()}
+                onClick={() => {
+                  if (!selectedCourtId) {
+                    toast({ title: 'Select a court', description: 'Please select a court before saving.', variant: 'destructive' });
+                    return;
+                  }
+                  saveTimeSlots.mutate();
+                }}
                 disabled={saveTimeSlots.isPending || !selectedCourtId}
                 className="w-full"
               >

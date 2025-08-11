@@ -66,18 +66,22 @@ router.post('/', protect, [
     const hours = duration / 60;
     const totalAmount = court.pricePerHour * hours;
 
-    // Create booking
+    // Create booking (auto-confirm)
     const bookingId = uuidv4();
     await db.run(`
-      INSERT INTO bookings (id, userId, courtId, date, startTime, endTime, duration, totalAmount, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO bookings (id, userId, courtId, date, startTime, endTime, duration, totalAmount, status, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
     `, [bookingId, req.user.id, courtId, date, startTime, endTime, duration, totalAmount, notes || null]);
 
     // Get created booking with venue details
     const booking = await db.get(`
-      SELECT b.*, c.name as courtName, c.pricePerHour, v.name as venueName, v.location as venueLocation
+      SELECT b.*, 
+             c.name as courtName, c.pricePerHour, 
+             s.name as sportName,
+             v.id as venueId, v.name as venueName, v.location as venueLocation
       FROM bookings b
       LEFT JOIN courts c ON b.courtId = c.id
+      LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE b.id = ?
     `, [bookingId]);
@@ -92,6 +96,82 @@ router.post('/', protect, [
       success: false,
       error: 'Server error'
     });
+  }
+});
+
+// @desc    Bulk create bookings for multiple slots
+// @route   POST /api/bookings/bulk
+// @access  Private
+router.post('/bulk', protect, async (req, res) => {
+  try {
+    const { courtId, date, slots, notes } = req.body;
+    if (!courtId || !date || !Array.isArray(slots) || slots.length === 0) {
+      return res.status(400).json({ success: false, error: 'courtId, date and slots[] are required' });
+    }
+
+    const db = getDatabase();
+
+    // Validate court
+    const court = await db.get(`
+      SELECT c.*, v.isApproved, v.isActive
+      FROM courts c JOIN venues v ON c.venueId = v.id
+      WHERE c.id = ? AND c.isActive = 1 AND v.isApproved = 1 AND v.isActive = 1
+    `, [courtId]);
+    if (!court) {
+      return res.status(404).json({ success: false, error: 'Court not found or not available' });
+    }
+
+    // Start transaction
+    await db.run('BEGIN');
+
+    const created = [];
+    for (const s of slots) {
+      const { startTime, endTime } = s;
+      if (!startTime || !endTime) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ success: false, error: 'Each slot requires startTime and endTime' });
+      }
+
+      // Check conflict
+      const conflict = await db.get(`
+        SELECT 1 FROM bookings
+        WHERE courtId = ? AND date = ? AND status IN ('confirmed','pending')
+        AND (startTime < ? AND endTime > ?)
+      `, [courtId, date, endTime, startTime]);
+      if (conflict) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ success: false, error: `Slot ${startTime}-${endTime} is already booked` });
+      }
+
+      // Compute duration in minutes
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      const duration = (eh * 60 + em) - (sh * 60 + sm);
+      const totalAmount = court.pricePerHour * (duration / 60);
+
+      const id = uuidv4();
+      await db.run(`
+        INSERT INTO bookings (id, userId, courtId, date, startTime, endTime, duration, totalAmount, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+      `, [id, req.user.id, courtId, date, startTime, endTime, duration, totalAmount, notes || null]);
+
+      const row = await db.get(`
+        SELECT b.*, c.name as courtName, s.name as sportName, v.id as venueId, v.name as venueName, v.location as venueLocation
+        FROM bookings b
+        JOIN courts c ON b.courtId = c.id
+        JOIN sports s ON c.sportId = s.id
+        JOIN venues v ON c.venueId = v.id
+        WHERE b.id = ?
+      `, [id]);
+      created.push(row);
+    }
+
+    await db.run('COMMIT');
+    return res.status(201).json({ success: true, data: created });
+  } catch (error) {
+    try { await getDatabase().run('ROLLBACK'); } catch {}
+    console.error('Bulk create bookings error:', error);
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
@@ -128,9 +208,13 @@ router.get('/', protect, [
 
     // Get bookings
     const bookings = await db.all(`
-      SELECT b.*, c.name as courtName, v.name as venueName, v.location as venueLocation
+      SELECT b.*, 
+             c.name as courtName, c.pricePerHour,
+             s.name as sportName,
+             v.id as venueId, v.name as venueName, v.location as venueLocation
       FROM bookings b
       LEFT JOIN courts c ON b.courtId = c.id
+      LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE ${whereClause}
       ORDER BY b.date DESC, b.startTime DESC
@@ -175,9 +259,13 @@ router.get('/:id', protect, async (req, res) => {
     const db = getDatabase();
 
     const booking = await db.get(`
-      SELECT b.*, c.name as courtName, c.pricePerHour, v.name as venueName, v.location as venueLocation
+      SELECT b.*, 
+             c.name as courtName, c.pricePerHour,
+             s.name as sportName,
+             v.id as venueId, v.name as venueName, v.location as venueLocation
       FROM bookings b
       LEFT JOIN courts c ON b.courtId = c.id
+      LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE b.id = ? AND b.userId = ?
     `, [id, req.user.id]);
@@ -254,9 +342,13 @@ router.put('/:id/cancel', protect, async (req, res) => {
     `, [id]);
 
     const updatedBooking = await db.get(`
-      SELECT b.*, c.name as courtName, v.name as venueName
+      SELECT b.*, 
+             c.name as courtName, c.pricePerHour,
+             s.name as sportName,
+             v.id as venueId, v.name as venueName
       FROM bookings b
       LEFT JOIN courts c ON b.courtId = c.id
+      LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE b.id = ?
     `, [id]);
@@ -324,9 +416,13 @@ router.put('/:id/status', protect, authorize('owner', 'admin'), [
     `, [status, id]);
 
     const updatedBooking = await db.get(`
-      SELECT b.*, c.name as courtName, v.name as venueName
+      SELECT b.*, 
+             c.name as courtName, c.pricePerHour,
+             s.name as sportName,
+             v.id as venueId, v.name as venueName
       FROM bookings b
       LEFT JOIN courts c ON b.courtId = c.id
+      LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE b.id = ?
     `, [id]);

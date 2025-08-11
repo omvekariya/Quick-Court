@@ -182,6 +182,13 @@ export const bookingsAPI = {
     notes?: string;
   }) => api.post('/bookings', data),
 
+  bulkCreate: (data: {
+    courtId: string;
+    date: string;
+    slots: Array<{ startTime: string; endTime: string }>;
+    notes?: string;
+  }) => api.post('/bookings/bulk', data),
+
   getAll: (params?: {
     status?: string;
     page?: number;

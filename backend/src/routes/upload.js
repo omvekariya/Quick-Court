@@ -7,15 +7,15 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dkd3hvo0m",
-  api_key: process.env.CLOUDINARY_API_KEY || "227977153331293",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "_pLjeeVnvDO4I_VhNMWL6_KgehM",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "dx6x5xijo",
+  api_key: process.env.CLOUDINARY_API_KEY || "187423451296415",
+  api_secret: process.env.CLOUDINARY_API_SECRET || "k87pUXV_lntcJEaP8QiSw-m_t98",
 });
 
 // @desc    Upload image to Cloudinary
 // @route   POST /api/upload/image
 // @access  Private
-router.post('/image', protect, upload.single('file'), async (req, res) => {
+router.post('/image', protect, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });

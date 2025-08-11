@@ -547,7 +547,7 @@ router.get('/:venueId/courts/:courtId/slots', [
     const slots = await db.all(`
       SELECT ts.*
       FROM timeSlots ts
-      WHERE ts.courtId = ? AND ts.dayOfWeek = ? AND ts.isAvailable = 1
+      WHERE ts.courtId = ? AND ts.dayOfWeek = ? AND ts.isAvailable = 1 AND ts.isMaintenance = 0
       ORDER BY ts.startTime
     `, [courtId, dayOfWeek]);
 
@@ -559,7 +559,7 @@ router.get('/:venueId/courts/:courtId/slots', [
     `, [courtId, date]);
 
     // Filter out booked slots
-    const availableSlots = slots.filter(slot => {
+    const availableSlots = slots.map(slot => {
       return !bookings.some(booking => {
         const slotStart = slot.startTime;
         const slotEnd = slot.endTime;
@@ -567,8 +567,9 @@ router.get('/:venueId/courts/:courtId/slots', [
         const bookingEnd = booking.endTime;
         
         // Check if slots overlap
-        return (slotStart < bookingEnd && slotEnd > bookingStart);
-      });
+        const isBooked = (slotStart < bookingEnd && slotEnd > bookingStart);
+        return isBooked;
+      }) ? { ...slot, booked: true } : { ...slot, booked: false };
     });
 
     res.json({
