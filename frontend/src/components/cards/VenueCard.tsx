@@ -2,17 +2,33 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MapPin, Star, Clock, Users } from "lucide-react";
+
+interface Court {
+  id: string;
+  name: string;
+  description?: string;
+  pricePerHour: number;
+  isActive: boolean;
+  sportId: string;
+  sportType: string;
+  sportIcon?: string;
+}
 
 interface Venue {
   id: string;
   name: string;
   description: string;
   location: string;
-  address: string;
+  address?: string;
   rating: number;
-  totalRatings: number;
+  totalRatings?: number;
   images: string[] | string;
   amenities: string[] | string;
+  sportTypes: string[];
+  courts: Court[];
+  minPrice?: number;
+  maxPrice?: number;
   ownerId: string;
   isApproved: boolean;
   isActive: boolean;
@@ -41,6 +57,18 @@ export default function VenueCard({ venue }: Props) {
 
   const rating = typeof venue.rating === 'number' ? venue.rating : 0;
   const totalRatings = typeof venue.totalRatings === 'number' ? venue.totalRatings : 0;
+  
+  // Calculate price range from courts
+  const priceRange = venue.courts && venue.courts.length > 0 
+    ? venue.minPrice === venue.maxPrice 
+      ? `$${venue.minPrice}/hr`
+      : `$${venue.minPrice}-${venue.maxPrice}/hr`
+    : 'Price not available';
+
+  // Get unique sport types from courts
+  const availableSports = venue.courts 
+    ? [...new Set(venue.courts.map(court => court.sportType))]
+    : venue.sportTypes || [];
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -59,27 +87,65 @@ export default function VenueCard({ venue }: Props) {
         <p className="text-sm text-muted-foreground line-clamp-2">
           {venue.description ?? ''}
         </p>
+        
+        {/* Sport Types */}
         <div className="flex flex-wrap gap-2">
-          {amenities.slice(0, 3).map((amenity: string) => (
-            <Badge key={amenity} variant="secondary" className="text-xs">
-              {amenity}
+          {availableSports.slice(0, 3).map((sport: string) => (
+            <Badge key={sport} variant="secondary" className="text-xs">
+              {sport}
             </Badge>
           ))}
-          {amenities.length > 3 && (
+          {availableSports.length > 3 && (
             <Badge variant="outline" className="text-xs">
-              +{amenities.length - 3} more
+              +{availableSports.length - 3} more
             </Badge>
           )}
         </div>
+
+        {/* Amenities */}
+        {amenities.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {amenities.slice(0, 2).map((amenity: string) => (
+              <Badge key={amenity} variant="outline" className="text-xs">
+                {amenity}
+              </Badge>
+            ))}
+            {amenities.length > 2 && (
+              <Badge variant="outline" className="text-xs">
+                +{amenities.length - 2} more
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Location and Rating */}
         <div className="text-sm text-muted-foreground flex items-center justify-between">
-          <span>{venue.location ?? ''}</span>
           <span className="flex items-center gap-1">
-            ⭐ {rating.toFixed(1)}
-            <span className="text-xs">({totalRatings})</span>
+            <MapPin className="h-3 w-3" />
+            {venue.location ?? ''}
+          </span>
+          <span className="flex items-center gap-1">
+            <Star className="h-3 w-3 fill-current" />
+            {rating.toFixed(1)}
+            {totalRatings > 0 && (
+              <span className="text-xs">({totalRatings})</span>
+            )}
           </span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{venue.address ?? ''}</span>
+
+        {/* Price and Courts Info */}
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{priceRange}</span>
+          <span className="text-muted-foreground">
+            {venue.courts?.length || 0} court{venue.courts?.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Action Button */}
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-xs text-muted-foreground">
+            {venue.address || venue.location}
+          </span>
           <Button asChild size="sm">
             <Link to={`/venue/${venue.id}`}>View Details</Link>
           </Button>

@@ -23,7 +23,7 @@ import TimeSlotManagement from "@/pages/owner/TimeSlotManagement";
 import BookingsOverview from "@/pages/owner/BookingsOverview";
 import FacilityApproval from "@/pages/admin/FacilityApproval";
 import UserManagement from "@/pages/admin/UserManagement";
-import Reports from "@/pages/admin/Reports";
+
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -107,11 +107,7 @@ const App = () => (
                   <UserManagement />
                 </ProtectedRoute>
               } />
-              <Route path="/admin/reports" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <Reports />
-                </ProtectedRoute>
-              } />
+
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

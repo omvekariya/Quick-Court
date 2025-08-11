@@ -130,12 +130,9 @@ const createTables = async () => {
       userId TEXT NOT NULL,
       courtId TEXT NOT NULL,
       date TEXT NOT NULL, -- Format: YYYY-MM-DD
-      startTime TEXT NOT NULL, -- Format: HH:MM
-      endTime TEXT NOT NULL, -- Format: HH:MM
-      duration INTEGER NOT NULL, -- in minutes
       totalAmount REAL NOT NULL,
-      status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
-      paymentStatus TEXT DEFAULT 'pending' CHECK (paymentStatus IN ('pending', 'paid', 'refunded')),
+      status TEXT DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'cancelled', 'completed')),
+      paymentStatus TEXT DEFAULT 'paid' CHECK (paymentStatus IN ('pending', 'paid', 'refunded')),
       paymentMethod TEXT,
       stripePaymentIntentId TEXT,
       notes TEXT,
@@ -143,6 +140,20 @@ const createTables = async () => {
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE,
       FOREIGN KEY (courtId) REFERENCES courts (id) ON DELETE CASCADE
+    )
+  `);
+
+  // Booking slots table for multiple time slots in one booking
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS bookingSlots (
+      id TEXT PRIMARY KEY,
+      bookingId TEXT NOT NULL,
+      startTime TEXT NOT NULL, -- Format: HH:MM
+      endTime TEXT NOT NULL, -- Format: HH:MM
+      duration INTEGER NOT NULL, -- in minutes
+      slotAmount REAL NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (bookingId) REFERENCES bookings (id) ON DELETE CASCADE
     )
   `);
 

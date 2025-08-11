@@ -46,12 +46,13 @@ router.post('/', protect, [
 
     // Check if the time slot is available
     const conflictingBooking = await db.get(`
-      SELECT * FROM bookings
-      WHERE courtId = ? AND date = ? AND status IN ('confirmed', 'pending')
+      SELECT bs.* FROM bookingSlots bs
+      JOIN bookings b ON bs.bookingId = b.id
+      WHERE b.courtId = ? AND b.date = ? AND b.status IN ('confirmed')
       AND (
-        (startTime < ? AND endTime > ?) OR
-        (startTime < ? AND endTime > ?) OR
-        (startTime >= ? AND endTime <= ?)
+        (bs.startTime < ? AND bs.endTime > ?) OR
+        (bs.startTime < ? AND bs.endTime > ?) OR
+        (bs.startTime >= ? AND bs.endTime <= ?)
       )
     `, [courtId, date, endTime, startTime, endTime, startTime, startTime, endTime]);
 
@@ -66,14 +67,21 @@ router.post('/', protect, [
     const hours = duration / 60;
     const totalAmount = court.pricePerHour * hours;
 
-    // Create booking (auto-confirm)
+    // Create booking (auto-confirm with paid status)
     const bookingId = uuidv4();
     await db.run(`
-      INSERT INTO bookings (id, userId, courtId, date, startTime, endTime, duration, totalAmount, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
-    `, [bookingId, req.user.id, courtId, date, startTime, endTime, duration, totalAmount, notes || null]);
+      INSERT INTO bookings (id, userId, courtId, date, totalAmount, status, paymentStatus, notes)
+      VALUES (?, ?, ?, ?, ?, 'confirmed', 'paid', ?)
+    `, [bookingId, req.user.id, courtId, date, totalAmount, notes || null]);
 
-    // Get created booking with venue details
+    // Create booking slot
+    const slotId = uuidv4();
+    await db.run(`
+      INSERT INTO bookingSlots (id, bookingId, startTime, endTime, duration, slotAmount)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [slotId, bookingId, startTime, endTime, duration, totalAmount]);
+
+    // Get created booking with venue details and slots
     const booking = await db.get(`
       SELECT b.*, 
              c.name as courtName, c.pricePerHour, 
@@ -85,6 +93,13 @@ router.post('/', protect, [
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE b.id = ?
     `, [bookingId]);
+
+    // Get slots for this booking
+    const slots = await db.all(`
+      SELECT * FROM bookingSlots WHERE bookingId = ?
+    `, [bookingId]);
+
+    booking.slots = slots;
 
     res.status(201).json({
       success: true,
@@ -124,7 +139,10 @@ router.post('/bulk', protect, async (req, res) => {
     // Start transaction
     await db.run('BEGIN');
 
-    const created = [];
+    // Calculate total amount for all slots
+    let totalAmount = 0;
+    const slotDetails = [];
+    
     for (const s of slots) {
       const { startTime, endTime } = s;
       if (!startTime || !endTime) {
@@ -134,9 +152,10 @@ router.post('/bulk', protect, async (req, res) => {
 
       // Check conflict
       const conflict = await db.get(`
-        SELECT 1 FROM bookings
-        WHERE courtId = ? AND date = ? AND status IN ('confirmed','pending')
-        AND (startTime < ? AND endTime > ?)
+        SELECT 1 FROM bookingSlots bs
+        JOIN bookings b ON bs.bookingId = b.id
+        WHERE b.courtId = ? AND b.date = ? AND b.status IN ('confirmed')
+        AND (bs.startTime < ? AND bs.endTime > ?)
       `, [courtId, date, endTime, startTime]);
       if (conflict) {
         await db.run('ROLLBACK');
@@ -147,27 +166,47 @@ router.post('/bulk', protect, async (req, res) => {
       const [sh, sm] = startTime.split(':').map(Number);
       const [eh, em] = endTime.split(':').map(Number);
       const duration = (eh * 60 + em) - (sh * 60 + sm);
-      const totalAmount = court.pricePerHour * (duration / 60);
-
-      const id = uuidv4();
-      await db.run(`
-        INSERT INTO bookings (id, userId, courtId, date, startTime, endTime, duration, totalAmount, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
-      `, [id, req.user.id, courtId, date, startTime, endTime, duration, totalAmount, notes || null]);
-
-      const row = await db.get(`
-        SELECT b.*, c.name as courtName, s.name as sportName, v.id as venueId, v.name as venueName, v.location as venueLocation
-        FROM bookings b
-        JOIN courts c ON b.courtId = c.id
-        JOIN sports s ON c.sportId = s.id
-        JOIN venues v ON c.venueId = v.id
-        WHERE b.id = ?
-      `, [id]);
-      created.push(row);
+      const slotAmount = court.pricePerHour * (duration / 60);
+      totalAmount += slotAmount;
+      
+      slotDetails.push({ startTime, endTime, duration, slotAmount });
     }
 
+    // Create single booking record
+    const bookingId = uuidv4();
+    await db.run(`
+      INSERT INTO bookings (id, userId, courtId, date, totalAmount, status, paymentStatus, notes)
+      VALUES (?, ?, ?, ?, ?, 'confirmed', 'paid', ?)
+    `, [bookingId, req.user.id, courtId, date, totalAmount, notes || null]);
+
+    // Create all booking slots
+    for (const slot of slotDetails) {
+      const slotId = uuidv4();
+      await db.run(`
+        INSERT INTO bookingSlots (id, bookingId, startTime, endTime, duration, slotAmount)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [slotId, bookingId, slot.startTime, slot.endTime, slot.duration, slot.slotAmount]);
+    }
+
+    // Get created booking with venue details and slots
+    const booking = await db.get(`
+      SELECT b.*, c.name as courtName, s.name as sportName, v.id as venueId, v.name as venueName, v.location as venueLocation
+      FROM bookings b
+      JOIN courts c ON b.courtId = c.id
+      JOIN sports s ON c.sportId = s.id
+      JOIN venues v ON c.venueId = v.id
+      WHERE b.id = ?
+    `, [bookingId]);
+
+    // Get all slots for this booking
+    const allSlots = await db.all(`
+      SELECT * FROM bookingSlots WHERE bookingId = ?
+    `, [bookingId]);
+
+    booking.slots = allSlots;
+
     await db.run('COMMIT');
-    return res.status(201).json({ success: true, data: created });
+    return res.status(201).json({ success: true, data: booking });
   } catch (error) {
     try { await getDatabase().run('ROLLBACK'); } catch {}
     console.error('Bulk create bookings error:', error);
@@ -179,7 +218,7 @@ router.post('/bulk', protect, async (req, res) => {
 // @route   GET /api/bookings
 // @access  Private
 router.get('/', protect, [
-  query('status').optional().isIn(['pending', 'confirmed', 'cancelled', 'completed']),
+  query('status').optional().isIn(['confirmed', 'cancelled', 'completed']),
   query('page').optional().isNumeric(),
   query('limit').optional().isNumeric()
 ], async (req, res) => {
@@ -217,9 +256,17 @@ router.get('/', protect, [
       LEFT JOIN sports s ON c.sportId = s.id
       LEFT JOIN venues v ON c.venueId = v.id
       WHERE ${whereClause}
-      ORDER BY b.date DESC, b.startTime DESC
+      ORDER BY b.date DESC
       LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
+
+    // Get slots for each booking
+    for (const booking of bookings) {
+      const slots = await db.all(`
+        SELECT * FROM bookingSlots WHERE bookingId = ? ORDER BY startTime
+      `, [booking.id]);
+      booking.slots = slots;
+    }
 
     // Get total count
     const countResult = await db.get(`
@@ -276,6 +323,12 @@ router.get('/:id', protect, async (req, res) => {
         error: 'Booking not found'
       });
     }
+
+    // Get slots for this booking
+    const slots = await db.all(`
+      SELECT * FROM bookingSlots WHERE bookingId = ? ORDER BY startTime
+    `, [id]);
+    booking.slots = slots;
 
     res.json({
       success: true,
@@ -371,7 +424,7 @@ router.put('/:id/cancel', protect, async (req, res) => {
 // @route   PUT /api/bookings/:id/status
 // @access  Private (Owner/Admin)
 router.put('/:id/status', protect, authorize('owner', 'admin'), [
-  body('status').isIn(['pending', 'confirmed', 'cancelled', 'completed']).withMessage('Valid status is required')
+  body('status').isIn(['confirmed', 'cancelled', 'completed']).withMessage('Valid status is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

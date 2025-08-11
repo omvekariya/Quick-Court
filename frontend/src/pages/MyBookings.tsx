@@ -15,14 +15,12 @@ import { format, parseISO } from "date-fns";
 import { Link } from "react-router-dom";
 
 const STATUS_COLORS = {
-  pending: "bg-yellow-100 text-yellow-800",
   confirmed: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800",
   completed: "bg-blue-100 text-blue-800",
 };
 
 const STATUS_LABELS = {
-  pending: "Pending",
   confirmed: "Confirmed",
   cancelled: "Cancelled",
   completed: "Completed",
@@ -45,9 +43,6 @@ export default function MyBookings() {
     id: string;
     courtId: string;
     date: string;
-    startTime: string;
-    endTime: string;
-    duration: number;
     totalAmount: number;
     status: string;
     paymentStatus: string;
@@ -59,6 +54,13 @@ export default function MyBookings() {
     venueId: string;
     venueName: string;
     venueLocation: string;
+    slots: Array<{
+      id: string;
+      startTime: string;
+      endTime: string;
+      duration: number;
+      slotAmount: number;
+    }>;
   }>;
 
   const cancelBooking = useMutation({
@@ -194,9 +196,9 @@ export default function MyBookings() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Venue & Court</TableHead>
-                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Date & Time Slots</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead>Total Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -222,15 +224,23 @@ export default function MyBookings() {
                           <div className="font-medium">
                             {format(parseISO(booking.date), 'MMM dd, yyyy')}
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {booking.startTime} - {booking.endTime}
+                          <div className="space-y-1">
+                            {booking.slots.map((slot, index) => (
+                              <div key={slot.id} className="text-sm text-muted-foreground">
+                                {slot.startTime} - {slot.endTime}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {booking.duration} min
+                        <div className="space-y-1">
+                          {booking.slots.map((slot) => (
+                            <div key={slot.id} className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {slot.duration} min
+                            </div>
+                          ))}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -270,7 +280,7 @@ export default function MyBookings() {
                               <Eye className="h-4 w-4" />
                             </Link>
                           </Button>
-                          {booking.status === 'pending' || booking.status === 'confirmed' ? (
+                          {booking.status === 'confirmed' ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -319,7 +329,7 @@ export default function MyBookings() {
           <Card>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">
-                {bookings.filter(b => b.status === 'pending' || b.status === 'confirmed').length}
+                {bookings.filter(b => b.status === 'confirmed').length}
               </div>
               <div className="text-sm text-muted-foreground">Upcoming</div>
             </CardContent>

@@ -42,7 +42,6 @@ const navByRole: Record<Role, { label: string; to: string }[]> = {
     { label: "Dashboard", to: "/admin/dashboard" },
     { label: "Facility Approval", to: "/admin/facility-approval" },
     { label: "Users", to: "/admin/users" },
-    { label: "Reports", to: "/admin/reports" },
     { label: "Profile", to: "/profile" },
   ],
 };

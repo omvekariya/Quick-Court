@@ -37,7 +37,7 @@ export default function BookCourt() {
   const courts = venueData?.data?.data?.courts || [];
 
   // Fetch available time slots for selected court and date
-  const { data: timeSlotsData, isLoading: slotsLoading } = useQuery({
+  const { data: timeSlotsData, isLoading: slotsLoading, error: slotsError } = useQuery({
     enabled: !!selectedCourt && !!selectedDate,
     queryKey: ["time-slots", selectedCourt, selectedDate],
     queryFn: () => venuesAPI.getTimeSlots(venueId as string, selectedCourt, format(selectedDate!, 'yyyy-MM-dd')),
@@ -57,8 +57,14 @@ export default function BookCourt() {
   // Create booking mutation
   const createBooking = useMutation({
     mutationFn: async () => {
-      if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
-        throw new Error('Please select court, date and at least one slot');
+      if (!selectedCourt) {
+        throw new Error('Please select a court');
+      }
+      if (!selectedDate) {
+        throw new Error('Please select a date');
+      }
+      if (selectedSlots.length === 0) {
+        throw new Error('Please select at least one time slot');
       }
 
       return await bookingsAPI.bulkCreate({
@@ -91,7 +97,11 @@ export default function BookCourt() {
   const availableDates = Array.from({ length: 30 }, (_, i) => addDays(new Date(), i));
 
   // Filter out past dates and unavailable dates
-  const selectableDates = availableDates.filter(date => date >= new Date());
+  const selectableDates = availableDates.filter(date => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date >= today;
+  });
 
   // Calculate price for selected slots
   const selectedCourtData = courts.find(c => c.id === selectedCourt);
@@ -99,7 +109,8 @@ export default function BookCourt() {
   const totalMinutes = selectedSlots.reduce((sum, s) => {
     const [sh, sm] = s.startTime.split(':').map(Number);
     const [eh, em] = s.endTime.split(':').map(Number);
-    return sum + ((eh * 60 + em) - (sh * 60 + sm));
+    const slotDuration = (eh * 60 + em) - (sh * 60 + sm);
+    return sum + Math.max(0, slotDuration); // Ensure non-negative duration
   }, 0);
   const totalPrice = (pricePerHour * totalMinutes) / 60;
 
@@ -133,12 +144,30 @@ export default function BookCourt() {
   if (venueError) {
     return (
       <main className="container mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Book a Court</h1>
+            <p className="text-muted-foreground mt-2">
+              Select your preferred court, date, and time slot
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Back
+          </Button>
+        </div>
+        
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load venue details. Please try again.
+            Failed to load venue details. Please try again or go back to select a different venue.
           </AlertDescription>
         </Alert>
+        
+        <div className="mt-4">
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
       </main>
     );
   }
@@ -171,9 +200,18 @@ export default function BookCourt() {
               <CardHeader>
                 <Skeleton className="h-6 w-32" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3 mt-2" />
+                <Skeleton className="h-4 w-2/3" />
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-6 w-16" />
+                  ))}
+                </div>
               </CardContent>
             </Card>
           ) : venue ? (
@@ -213,7 +251,24 @@ export default function BookCourt() {
               <CardTitle>Select Court</CardTitle>
             </CardHeader>
             <CardContent>
-              {courts.length === 0 ? (
+              {venueLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                        <div className="text-right space-y-2">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-4 w-12" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : courts.length === 0 ? (
                 <p className="text-muted-foreground">No courts available at this venue.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -274,33 +329,74 @@ export default function BookCourt() {
                 </CardHeader>
                 <CardContent>
                   {slotsLoading ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
+                    <div className="space-y-3">
+                      <Skeleton className="h-4 w-32" />
+                      <div className="grid grid-cols-3 gap-2">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                      </div>
                     </div>
-                  ) : timeSlots.length === 0 ? (
-                    <p className="text-muted-foreground">
-                      No available time slots for the selected date.
-                    </p>
+                  ) : slotsError ? (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-2">
+                        Failed to load time slots.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Please try again or select a different date.
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        onClick={() => window.location.reload()}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : !timeSlots || timeSlots.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-2">
+                        No available time slots for the selected date.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Try selecting a different date or check back later.
+                      </p>
+                    </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {timeSlots.map((slot) => {
-                        const key = `${slot.startTime}-${slot.endTime}`;
-                        const isSelected = selectedSlots.some(s => `${s.startTime}-${s.endTime}` === key);
-                        return (
-                          <Button
-                            key={key}
-                            variant={isSelected ? "default" : slot.booked ? "secondary" : "outline"}
-                            disabled={slot.booked}
-                            onClick={() => toggleSlot({ startTime: slot.startTime, endTime: slot.endTime })}
-                            className="h-12"
-                          >
-                            {slot.startTime}
-                            {slot.booked ? ' (Booked)' : ''}
-                          </Button>
-                        );
-                      })}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="w-3 h-3 rounded-full bg-primary"></div>
+                        <span>Selected</span>
+                        <div className="w-3 h-3 rounded-full bg-secondary"></div>
+                        <span>Booked</span>
+                        <div className="w-3 h-3 rounded-full border border-border"></div>
+                        <span>Available</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {timeSlots.map((slot) => {
+                          const key = `${slot.startTime}-${slot.endTime}`;
+                          const isSelected = selectedSlots.some(s => `${s.startTime}-${s.endTime}` === key);
+                          const isBooked = slot.booked === true;
+                          return (
+                            <Button
+                              key={key}
+                              variant={isSelected ? "default" : isBooked ? "secondary" : "outline"}
+                              disabled={isBooked}
+                              onClick={() => !isBooked && toggleSlot({ startTime: slot.startTime, endTime: slot.endTime })}
+                              className="h-12 text-xs"
+                              title={isBooked ? 'This slot is already booked' : `Select ${slot.startTime} - ${slot.endTime}`}
+                            >
+                              <div className="flex flex-col items-center">
+                                <span className="font-medium">{slot.startTime}</span>
+                                {isBooked && <span className="text-xs opacity-75">Booked</span>}
+                                {isSelected && <span className="text-xs opacity-75">Selected</span>}
+                              </div>
+                            </Button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -336,44 +432,71 @@ export default function BookCourt() {
                       <span className="font-medium">{format(selectedDate, 'MMM dd, yyyy')}</span>
                     </div>
                   )}
-                  {selectedTimeSlot && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time:</span>
-                      <span className="font-medium">{selectedTimeSlot}</span>
+                  {selectedSlots.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Selected Slots:</span>
+                        <span className="font-medium">{selectedSlots.length} slot(s)</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSlots.map((slot, index) => (
+                          <div key={index} className="flex justify-between">
+                            <span>Slot {index + 1}:</span>
+                            <span>{slot.startTime} - {slot.endTime}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Duration:</span>
+                        <span className="font-medium">{totalMinutes} minutes</span>
+                      </div>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duration:</span>
-                    <span className="font-medium">{duration} minutes</span>
-                  </div>
-                  <div className="border-t pt-2">
-                    <div className="flex justify-between text-lg font-semibold">
-                      <span>Total Price:</span>
-                      <span>${totalPrice.toFixed(2)}</span>
+                  {selectedSlots.length > 0 && (
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>Total Price:</span>
+                        <span>${totalPrice.toFixed(2)}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
-              <Button
-                variant="hero"
-                className="w-full"
-                disabled={!selectedCourt || !selectedTimeSlot || !selectedDate || createBooking.isPending}
-                onClick={() => createBooking.mutate()}
-              >
-                {createBooking.isPending ? (
-                  "Creating Booking..."
-                ) : (
-                  <>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Book Now
-                  </>
+              <div className="space-y-2">
+                <Button
+                  variant="hero"
+                  className="w-full"
+                  disabled={!selectedCourt || selectedSlots.length === 0 || !selectedDate || createBooking.isPending}
+                  onClick={() => createBooking.mutate()}
+                >
+                  {createBooking.isPending ? (
+                    "Creating Booking..."
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Book Now
+                    </>
+                  )}
+                </Button>
+                
+                {selectedSlots.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setSelectedSlots([])}
+                    disabled={createBooking.isPending}
+                  >
+                    Clear Selection
+                  </Button>
                 )}
-              </Button>
+              </div>
 
-              <p className="text-xs text-muted-foreground text-center">
-                You will be charged ${totalPrice.toFixed(2)} for this booking
-              </p>
+              {selectedSlots.length > 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  You will be charged ${totalPrice.toFixed(2)} for this booking
+                </p>
+              )}
             </CardContent>
           </Card>
 

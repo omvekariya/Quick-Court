@@ -21,6 +21,8 @@ interface AuthContextType {
     password: string;
     fullName: string;
     phone?: string;
+    role: 'user' | 'owner';
+    otp: string;
   }) => Promise<void>;
   logout: () => void;
   updateProfile: (data: any) => Promise<void>;
@@ -71,7 +73,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Login failed');
+      console.error('Login error in AuthContext:', error);
+      // Provide more specific error messages
+      if (error.response?.status === 401) {
+        throw new Error('Invalid email or password');
+      } else if (error.response?.status === 400) {
+        throw new Error(error.response?.data?.error || 'Invalid input data');
+      } else if (error.response?.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      } else {
+        throw new Error(error.response?.data?.error || 'Login failed. Please try again.');
+      }
     }
   };
 
@@ -80,6 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     password: string;
     fullName: string;
     phone?: string;
+    role: 'user' | 'owner';
+    otp: string;
   }) => {
     try {
       const response = await authAPI.register(data);

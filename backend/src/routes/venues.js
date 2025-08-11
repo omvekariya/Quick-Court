@@ -62,14 +62,12 @@ router.get('/', [
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Get venues with courts and sports
+    // Get venues with basic info
     const venues = await db.all(`
       SELECT DISTINCT 
         v.*,
         u.fullName as ownerName,
         GROUP_CONCAT(DISTINCT s.name) as sportTypes,
-        GROUP_CONCAT(DISTINCT c.id) as courtIds,
-        GROUP_CONCAT(DISTINCT c.name) as courtNames,
         MIN(c.pricePerHour) as minPrice,
         MAX(c.pricePerHour) as maxPrice
       FROM venues v
@@ -81,6 +79,27 @@ router.get('/', [
       ORDER BY v.rating DESC, v.createdAt DESC
       LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
+
+    // Get detailed courts for each venue
+    for (let venue of venues) {
+      const courts = await db.all(`
+        SELECT 
+          c.id,
+          c.name,
+          c.description,
+          c.pricePerHour,
+          c.isActive,
+          s.id as sportId,
+          s.name as sportType,
+          s.icon as sportIcon
+        FROM courts c
+        LEFT JOIN sports s ON c.sportId = s.id
+        WHERE c.venueId = ? AND c.isActive = 1
+        ORDER BY c.name ASC
+      `, [venue.id]);
+      
+      venue.courts = courts;
+    }
 
     // Get total count
     const countResult = await db.get(`
@@ -101,8 +120,7 @@ router.get('/', [
       amenities: venue.amenities ? JSON.parse(venue.amenities) : [],
       openingHours: venue.openingHours ? JSON.parse(venue.openingHours) : {},
       sportTypes: venue.sportTypes ? venue.sportTypes.split(',') : [],
-      courtIds: venue.courtIds ? venue.courtIds.split(',') : [],
-      courtNames: venue.courtNames ? venue.courtNames.split(',') : []
+      // courts array is already populated above
     }));
 
     res.json({
@@ -252,8 +270,15 @@ router.get('/:id', async (req, res) => {
       try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        requester = { id: decoded.id, role: decoded.role };
-        console.log(`Authenticated user: ${requester.role} (${requester.id})`);
+        
+        // Fetch full user data from database to get role
+        const user = await db.get('SELECT id, role FROM users WHERE id = ? AND isActive = 1', [decoded.id]);
+        if (user) {
+          requester = { id: user.id, role: user.role };
+          console.log(`Authenticated user: ${requester.role} (${requester.id})`);
+        } else {
+          console.log('User not found or inactive, treating as public access');
+        }
       } catch (e) {
         console.log('Invalid token, treating as public access');
         // ignore invalid token for public access
@@ -269,7 +294,7 @@ router.get('/:id', async (req, res) => {
     if (requester && requester.role === 'admin') {
       // Admin can view any venue
       visibilityCondition = '1=1';
-    } else if (requester) {
+    } else if (requester && requester.role === 'owner') {
       // Owner can view their own venues or approved venues
       visibilityCondition = '(v.isApproved = 1 OR v.ownerId = ?)';
       visibilityParams = [requester.id];
@@ -553,23 +578,25 @@ router.get('/:venueId/courts/:courtId/slots', [
 
     // Get existing bookings for this date
     const bookings = await db.all(`
-      SELECT startTime, endTime
-      FROM bookings
-      WHERE courtId = ? AND date = ? AND status IN ('confirmed', 'pending')
+      SELECT bs.startTime, bs.endTime
+      FROM bookingSlots bs
+      JOIN bookings b ON bs.bookingId = b.id
+      WHERE b.courtId = ? AND b.date = ? AND b.status IN ('confirmed')
     `, [courtId, date]);
 
     // Filter out booked slots
     const availableSlots = slots.map(slot => {
-      return !bookings.some(booking => {
+      const isBooked = bookings.some(booking => {
         const slotStart = slot.startTime;
         const slotEnd = slot.endTime;
         const bookingStart = booking.startTime;
         const bookingEnd = booking.endTime;
         
         // Check if slots overlap
-        const isBooked = (slotStart < bookingEnd && slotEnd > bookingStart);
-        return isBooked;
-      }) ? { ...slot, booked: true } : { ...slot, booked: false };
+        return (slotStart < bookingEnd && slotEnd > bookingStart);
+      });
+      
+      return { ...slot, booked: isBooked };
     });
 
     res.json({
@@ -620,6 +647,53 @@ router.delete('/:id', protect, authorize('owner', 'admin'), async (req, res) => 
     });
   } catch (error) {
     console.error('Delete venue error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
+    });
+  }
+});
+
+// @desc    Get platform statistics
+// @route   GET /api/venues/stats
+// @access  Public
+router.get('/stats', async (req, res) => {
+  try {
+    const db = getDatabase();
+    
+    // Get total venues count
+    const venuesCount = await db.get('SELECT COUNT(*) as count FROM venues WHERE isApproved = 1 AND isActive = 1');
+    
+    // Get total courts count
+    const courtsCount = await db.get('SELECT COUNT(*) as count FROM courts WHERE isActive = 1');
+    
+    // Get total sports count
+    const sportsCount = await db.get('SELECT COUNT(*) as count FROM sports WHERE isActive = 1');
+    
+    // Get average rating
+    const avgRating = await db.get('SELECT AVG(rating) as average FROM venues WHERE isApproved = 1 AND isActive = 1 AND rating > 0');
+    
+    // Get total bookings count (if bookings table exists)
+    let bookingsCount = { count: 0 };
+    try {
+      bookingsCount = await db.get('SELECT COUNT(*) as count FROM bookings WHERE status = "confirmed"');
+    } catch (error) {
+      // Bookings table might not exist yet
+      console.log('Bookings table not available for stats');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalVenues: venuesCount.count,
+        totalCourts: courtsCount.count,
+        totalSports: sportsCount.count,
+        averageRating: avgRating.average ? parseFloat(avgRating.average).toFixed(1) : 0,
+        totalBookings: bookingsCount.count
+      }
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
     res.status(500).json({
       success: false,
       error: 'Server error'

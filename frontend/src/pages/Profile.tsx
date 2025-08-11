@@ -11,7 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, User, Shield, Mail, Phone, Calendar } from "lucide-react";
+import { AlertCircle, User, Shield, Mail, Phone, Calendar, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { authAPI } from "@/services/api";
 
 export default function Profile() {
   const { user, updateProfile, loading } = useAuth();
@@ -21,6 +22,13 @@ export default function Profile() {
   const [phone, setPhone] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Password change states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -51,6 +59,56 @@ export default function Profile() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all password fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await authAPI.changePassword({ currentPassword, newPassword });
+      toast({
+        title: "Success",
+        description: "Password changed successfully!",
+      });
+      // Clear password fields
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to change password",
+        variant: "destructive",
+      });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -258,13 +316,88 @@ export default function Profile() {
                     Security Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
+                  {/* Account Security Info */}
                   <div className="space-y-2">
                     <h4 className="font-medium">Account Security</h4>
                     <p className="text-sm text-muted-foreground">
                       Your account is secured with JWT authentication and password hashing.
                     </p>
                   </div>
+
+                  {/* Change Password Section */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Change Password
+                    </h4>
+                    <div className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="currentPassword" 
+                            type={showPasswords ? "text" : "password"}
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="Enter current password"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            onClick={() => setShowPasswords(!showPasswords)}
+                          >
+                            {showPasswords ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid gap-2">
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input 
+                          id="newPassword" 
+                          type={showPasswords ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Enter new password (min 6 characters)"
+                        />
+                      </div>
+                      
+                      <div className="grid gap-2">
+                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Input 
+                          id="confirmPassword" 
+                          type={showPasswords ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                        />
+                      </div>
+                      
+                      <Button 
+                        onClick={handleChangePassword}
+                        variant="hero"
+                        disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                      >
+                        {changingPassword ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Changing Password...
+                          </>
+                        ) : (
+                          "Change Password"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Role & Permissions */}
                   <div className="space-y-2">
                     <h4 className="font-medium">Role & Permissions</h4>
                     <p className="text-sm text-muted-foreground">

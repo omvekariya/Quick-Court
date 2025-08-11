@@ -1,6 +1,7 @@
 import { getDatabase, initializeDatabase } from './init.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns';
 
 const seedDatabase = async () => {
   try {
@@ -361,9 +362,18 @@ const seedDatabase = async () => {
       {
         id: uuidv4(),
         venueId: downtownVenue.id,
-        name: 'Table Tennis Room',
+        name: 'Table Tennis Room 1',
         sportId: tableTennisSport.id,
-        description: 'Air-conditioned table tennis room with 4 tables',
+        description: 'Air-conditioned table tennis room with 2 tables',
+        pricePerHour: 15,
+        isActive: 1,
+      },
+      {
+        id: uuidv4(),
+        venueId: downtownVenue.id,
+        name: 'Table Tennis Room 2',
+        sportId: tableTennisSport.id,
+        description: 'Air-conditioned table tennis room with 2 tables',
         pricePerHour: 15,
         isActive: 1,
       },
@@ -468,83 +478,111 @@ const seedDatabase = async () => {
       );
     }
 
-    // Get court IDs for bookings
+    // Get court IDs for bookings and time slots
     const court1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Court 1', downtownVenue.id]);
+    const court2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Court 2', downtownVenue.id]);
+    const court3 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Table Tennis Room 1', downtownVenue.id]);
     const tennisCourt1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Tennis Court 1', tennisVenue.id]);
+    const tennisCourt2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Tennis Court 2', tennisVenue.id]);
     const badmintonCourt1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Badminton Court 1', badmintonVenue.id]);
+    const badmintonCourt2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Badminton Court 2', badmintonVenue.id]);
+    const badmintonCourt3 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Badminton Court 3', badmintonVenue.id]);
+    const soccerCourt1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Soccer Field 1', soccerVenue.id]);
+    const soccerCourt2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Soccer Field 2', soccerVenue.id]);
+    const volleyballCourt1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Indoor Court 1', volleyballVenue.id]);
+    const volleyballCourt2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Outdoor Court 1', volleyballVenue.id]);
+    const tableTennisCourt1 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Table Tennis Room 1', downtownVenue.id]);
+    const tableTennisCourt2 = await db.get('SELECT id FROM courts WHERE name = ? AND venueId = ?', ['Table Tennis Room 2', downtownVenue.id]);
 
-    // Create bookings
+    // Create bookings with realistic dates (today and future)
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(today);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    
     const bookings = [
       {
         id: uuidv4(),
         userId: regularUser.id,
         courtId: court1.id,
-        date: '2024-01-15',
-        startTime: '10:00',
-        endTime: '12:00',
-        duration: 120,
+        date: format(today, 'yyyy-MM-dd'),
         totalAmount: 50,
         status: 'confirmed',
         paymentStatus: 'paid',
         paymentMethod: 'card',
         notes: 'Basketball game with friends',
+        slots: [
+          { startTime: '10:00', endTime: '12:00', duration: 120, slotAmount: 50 }
+        ]
       },
       {
         id: uuidv4(),
         userId: johnUser.id,
         courtId: tennisCourt1.id,
-        date: '2024-01-16',
-        startTime: '14:00',
-        endTime: '16:00',
-        duration: 120,
+        date: format(tomorrow, 'yyyy-MM-dd'),
         totalAmount: 80,
         status: 'confirmed',
         paymentStatus: 'paid',
         paymentMethod: 'card',
         notes: 'Tennis lesson',
+        slots: [
+          { startTime: '14:00', endTime: '16:00', duration: 120, slotAmount: 80 }
+        ]
       },
       {
         id: uuidv4(),
         userId: sarahUser.id,
         courtId: badmintonCourt1.id,
-        date: '2024-01-17',
-        startTime: '18:00',
-        endTime: '19:00',
-        duration: 60,
+        date: format(dayAfterTomorrow, 'yyyy-MM-dd'),
         totalAmount: 15,
         status: 'confirmed',
         paymentStatus: 'paid',
         paymentMethod: 'card',
         notes: 'Badminton practice',
+        slots: [
+          { startTime: '18:00', endTime: '19:00', duration: 60, slotAmount: 15 }
+        ]
       },
       {
         id: uuidv4(),
         userId: regularUser.id,
         courtId: court1.id,
-        date: '2024-01-20',
-        startTime: '16:00',
-        endTime: '18:00',
-        duration: 120,
+        date: format(tomorrow, 'yyyy-MM-dd'),
         totalAmount: 50,
-        status: 'pending',
-        paymentStatus: 'pending',
-        paymentMethod: null,
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        paymentMethod: 'card',
         notes: 'Weekend basketball game',
+        slots: [
+          { startTime: '16:00', endTime: '18:00', duration: 120, slotAmount: 50 }
+        ]
       },
     ];
 
     for (const booking of bookings) {
+      // Create booking record
       await db.run(
         `INSERT OR IGNORE INTO bookings (
-          id, userId, courtId, date, startTime, endTime, duration, totalAmount,
+          id, userId, courtId, date, totalAmount,
           status, paymentStatus, paymentMethod, notes, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"))`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"))`,
         [
-          booking.id, booking.userId, booking.courtId, booking.date, booking.startTime,
-          booking.endTime, booking.duration, booking.totalAmount, booking.status,
-          booking.paymentStatus, booking.paymentMethod, booking.notes
+          booking.id, booking.userId, booking.courtId, booking.date, booking.totalAmount,
+          booking.status, booking.paymentStatus, booking.paymentMethod, booking.notes
         ]
       );
+
+      // Create booking slots
+      for (const slot of booking.slots) {
+        const slotId = uuidv4();
+        await db.run(
+          `INSERT OR IGNORE INTO bookingSlots (
+            id, bookingId, startTime, endTime, duration, slotAmount, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))`,
+          [slotId, booking.id, slot.startTime, slot.endTime, slot.duration, slot.slotAmount]
+        );
+      }
     }
 
     // Create reviews
@@ -694,48 +732,37 @@ const seedDatabase = async () => {
       );
     }
 
-    // Create time slots
-    const timeSlots = [
-      {
-        id: uuidv4(),
-        courtId: court1.id,
-        startTime: '06:00',
-        endTime: '07:00',
-        dayOfWeek: 1, // Monday
-        isAvailable: 1,
-      },
-      {
-        id: uuidv4(),
-        courtId: court1.id,
-        startTime: '07:00',
-        endTime: '08:00',
-        dayOfWeek: 1,
-        isAvailable: 1,
-      },
-      {
-        id: uuidv4(),
-        courtId: tennisCourt1.id,
-        startTime: '08:00',
-        endTime: '09:00',
-        dayOfWeek: 2, // Tuesday
-        isAvailable: 1,
-      },
-      {
-        id: uuidv4(),
-        courtId: badmintonCourt1.id,
-        startTime: '18:00',
-        endTime: '19:00',
-        dayOfWeek: 3, // Wednesday
-        isAvailable: 0, // Not available
-      },
-    ];
+    // Create comprehensive time slots for all courts and days
+    const timeSlots = [];
+    
+    // Generate time slots for each court (6:00 AM to 10:00 PM, 1-hour slots)
+    const allCourts = [court1, court2, court3, tennisCourt1, tennisCourt2, badmintonCourt1, badmintonCourt2, badmintonCourt3, soccerCourt1, soccerCourt2, volleyballCourt1, volleyballCourt2, tableTennisCourt1, tableTennisCourt2];
+    
+    for (const court of allCourts) {
+      for (let day = 0; day < 7; day++) { // 0 = Sunday, 1 = Monday, etc.
+        for (let hour = 6; hour < 22; hour++) { // 6 AM to 10 PM
+          const startTime = `${hour.toString().padStart(2, '0')}:00`;
+          const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
+          
+          timeSlots.push({
+            id: uuidv4(),
+            courtId: court.id,
+            startTime,
+            endTime,
+            dayOfWeek: day,
+            isAvailable: 1,
+            isMaintenance: 0,
+          });
+        }
+      }
+    }
 
     for (const slot of timeSlots) {
       await db.run(
         `INSERT OR IGNORE INTO timeSlots (
-          id, courtId, startTime, endTime, dayOfWeek, isAvailable, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))`,
-        [slot.id, slot.courtId, slot.startTime, slot.endTime, slot.dayOfWeek, slot.isAvailable]
+          id, courtId, startTime, endTime, dayOfWeek, isAvailable, isMaintenance, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))`,
+        [slot.id, slot.courtId, slot.startTime, slot.endTime, slot.dayOfWeek, slot.isAvailable, slot.isMaintenance]
       );
     }
 
@@ -744,12 +771,12 @@ const seedDatabase = async () => {
     console.log('- 8 Sports (Basketball, Tennis, Badminton, Soccer, Volleyball, Table Tennis, Cricket, Swimming)');
     console.log('- 6 Users (Admin, Owner, Regular User, John, Sarah, Mike)');
     console.log('- 5 Venues (Downtown Sports Center, Riverside Tennis Club, Community Badminton Center, Elite Soccer Complex, Volleyball Arena)');
-    console.log('- 14 Courts across the venues');
-    console.log('- 4 Bookings with different statuses');
+    console.log('- 15 Courts across the venues');
+    console.log('- 4 Bookings with multiple time slots');
     console.log('- 3 Reviews for venues');
     console.log('- 2 Teams with members');
     console.log('- 3 Notifications');
-    console.log('- 4 Time slots');
+    console.log('- 1680 Time slots (16 hours × 7 days × 15 courts)');
     console.log('\n🔑 Login Credentials:');
     console.log('Admin: admin@quickcourt.com / password123');
     console.log('Owner: owner@quickcourt.com / password123');

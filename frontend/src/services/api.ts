@@ -29,9 +29,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only redirect to login if we're not already on a login page
+      // This prevents redirect loops and 404 errors
+      if (!window.location.pathname.includes('/auth/')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -44,6 +48,8 @@ export const authAPI = {
     password: string;
     fullName: string;
     phone?: string;
+    role: 'user' | 'owner';
+    otp: string;
   }) => api.post('/auth/register', data),
 
   login: (data: { email: string; password: string }) =>
@@ -61,6 +67,16 @@ export const authAPI = {
     currentPassword: string;
     newPassword: string;
   }) => api.put('/auth/change-password', data),
+
+  // New OTP endpoints
+  sendOTP: (data: { email: string; purpose: 'verification' | 'reset' }) =>
+    api.post('/auth/send-otp', data),
+
+  verifyOTP: (data: { email: string; otp: string; purpose: 'verification' | 'reset' }) =>
+    api.post('/auth/verify-otp', data),
+
+  resetPassword: (data: { email: string; otp: string; newPassword: string }) =>
+    api.post('/auth/reset-password', data),
 };
 
 // Venues API
@@ -97,6 +113,8 @@ export const venuesAPI = {
     api.get(`/venues/${venueId}/courts/${courtId}/slots`, {
       params: { date },
     }),
+
+  getStats: () => api.get('/venues/stats'),
 };
 
 // Courts API
@@ -129,17 +147,12 @@ export const paymentsAPI = {
 // Admin API
 export const adminAPI = {
   getPendingVenues: () => api.get('/admin/venues/pending'),
-
-  approveVenue: (id: string, approved: boolean, feedback?: string) =>
+  approveVenue: (id: string, approved: boolean, feedback?: string) => 
     api.put(`/admin/venues/${id}/approve`, { approved, feedback }),
-
-  getAllUsers: (params?: {
-    role?: string;
-    page?: number;
-    limit?: number;
-  }) => api.get('/admin/users', { params }),
-
-  updateUser: (id: string, data: any) => api.put(`/admin/users/${id}`, data),
+  getAllUsers: () => api.get('/admin/users'),
+  updateUser: (id: string, data: { isActive?: boolean; role?: string }) => 
+    api.put(`/admin/users/${id}`, data),
+  getDashboardStats: () => api.get('/admin/dashboard/stats'),
 };
 
 // Owner API
