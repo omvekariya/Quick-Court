@@ -195,12 +195,12 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Platform overview and key performance indicators.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" asChild>
+          {/* <Button variant="outline" asChild>
             <Link to="/admin/venues">
               <Eye className="h-4 w-4 mr-2" />
               Manage Venues
             </Link>
-          </Button>
+          </Button> */}
           <Button variant="outline" asChild>
             <Link to="/admin/users">
               <Users className="h-4 w-4 mr-2" />
@@ -543,12 +543,12 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 gap-3">
-              <Button variant="outline" asChild className="h-auto p-4 flex-col gap-2">
+              {/* <Button variant="outline" asChild className="h-auto p-4 flex-col gap-2">
                 <Link to="/admin/venues">
                   <Building2 className="h-6 w-6" />
                   <span>Manage Venues</span>
                 </Link>
-              </Button>
+              </Button> */}
               <Button variant="outline" asChild className="h-auto p-4 flex-col gap-2">
                 <Link to="/admin/users">
                   <Users className="h-6 w-6" />
@@ -556,7 +556,7 @@ export default function AdminDashboard() {
                 </Link>
               </Button>
               <Button variant="outline" asChild className="h-auto p-4 flex-col gap-2">
-                <Link to="/admin/venues/pending">
+                <Link to="/admin/facility-approval">
                   <CheckCircle className="h-6 w-6" />
                   <span>Review Pending Venues</span>
                 </Link>
