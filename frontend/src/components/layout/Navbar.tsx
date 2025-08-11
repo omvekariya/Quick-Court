@@ -72,7 +72,7 @@ export default function Navbar() {
 
   const brand = (
     <Link to="/" className="flex items-center gap-2">
-      <span className="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-[var(--gradient-primary)]">
+      <span className="text-lg font-extrabold tracking-tight bg-clip-text bg-[var(--gradient-primary)]">
         QuickCourt
       </span>
     </Link>

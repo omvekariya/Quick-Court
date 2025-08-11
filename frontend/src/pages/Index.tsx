@@ -56,6 +56,7 @@ const Index = () => {
     queryKey: ["sports"],
     queryFn: async () => {
       const response = await sportsAPI.getAll();
+      console.log(response.data.data);
       return response.data.data;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -73,7 +74,7 @@ const Index = () => {
   const popularVenues = venuesData?.slice(0, 3) || [];
 
   // Get popular sports (first 4, or all if less than 4)
-  const popularSports = sportsData?.slice(0, 4) || [];
+  const popularSports = Array.isArray(sportsData) ? sportsData?.slice(0, 4) : sportsData?.data?.data?.slice(0, 4) || [];
 
   // Handle search
   const handleSearch = () => {

@@ -94,6 +94,7 @@ router.get('/users', async (req, res) => {
     const users = await db.all(`
       SELECT id, email, fullName, phone, role, isVerified, isActive, createdAt
       FROM users
+      where role != 'admin'
       ORDER BY createdAt DESC
     `);
 
