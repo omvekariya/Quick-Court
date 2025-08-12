@@ -189,10 +189,10 @@ router.get('/dashboard/stats', async (req, res) => {
     // Platform overview metrics
     const overview = await db.get(`
       SELECT 
-        COUNT(DISTINCT u.id) as totalUsers,
-        COUNT(DISTINCT CASE WHEN u.role = 'user' THEN u.id END) as regularUsers,
-        COUNT(DISTINCT CASE WHEN u.role = 'owner' THEN u.id END) as venueOwners,
-        COUNT(DISTINCT v.id) as totalVenues,
+        COUNT(DISTINCT CASE WHEN u.isActive = 1 THEN u.id END) as totalUsers,
+        COUNT(DISTINCT CASE WHEN u.role = 'user' and u.isActive = 1 THEN u.id END) as regularUsers,
+        COUNT(DISTINCT CASE WHEN u.role = 'owner' and u.isActive = 1 THEN u.id END) as venueOwners,
+        COUNT(DISTINCT CASE WHEN v.isApproved != 2 THEN v.id END) as totalVenues,
         COUNT(DISTINCT CASE WHEN v.isApproved = 1 THEN v.id END) as approvedVenues,
         COUNT(DISTINCT CASE WHEN v.isApproved = 0 THEN v.id END) as pendingVenues,
         COUNT(DISTINCT c.id) as totalCourts,
