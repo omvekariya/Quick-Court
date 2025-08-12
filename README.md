@@ -2,6 +2,19 @@
 
 A comprehensive sports venue booking platform that connects sports enthusiasts with local sports facilities. Built with React, TypeScript, Node.js, and SQLite.
 
+---
+## 👨‍💻 Team Members
+
+| Name                         | Email                      |
+| ---------------------------- | -------------------------- |
+| *Prince Harshadbhai Patel* | prins14104@gmail.com       |
+| *Om Sanjaybhai Vekariya*   | omvekariya31@gmail.com     |
+| *Dhruv Pravinbhai Raiyani* | dhruvraiyani2004@gmail.com |
+
+---
+📽 *Demo Video*: [https://drive.google.com/file/d/1PYhFzrEXkJ2jinoyonqsPNwDYi3DAtf6/view](https://drive.google.com/file/d/1PYhFzrEXkJ2jinoyonqsPNwDYi3DAtf6/view)
+---
+
 ## 🏀 Features
 
 ### For Users
