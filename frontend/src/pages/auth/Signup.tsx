@@ -35,6 +35,9 @@ export default function Signup() {
       return;
     }
 
+    
+  if (!validateForm()) return;
+
     setSendingOTP(true);
     try {
       await authAPI.sendOTP({ email, purpose: 'verification' });
@@ -114,6 +117,37 @@ export default function Signup() {
       setSendingOTP(false);
     }
   };
+
+  const validateForm = () => {
+    if (!email.trim() || !password.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    // simple email pattern
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
 
   const goBackToForm = () => {
     setStep('form');
