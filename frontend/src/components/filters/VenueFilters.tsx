@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import { useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,7 +36,22 @@ export default function VenueFilters({
   availableSports,
   loading = false,
 }: Props) {
+  const location = useLocation();
   const sports = useMemo(() => [...availableSports], [availableSports]);
+
+  // Prefill values from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const qParam = params.get("q");
+    const sportParam = params.get("sport");
+
+    if (qParam && qParam !== search) {
+      setSearch(qParam);
+    }
+    if (sportParam && sportParam !== sport) {
+      setSport(sportParam);
+    }
+  }, [location.search]);
 
   if (loading) {
     return (
